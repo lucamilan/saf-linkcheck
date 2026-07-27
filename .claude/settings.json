@@ -1,0 +1,68 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(saf-tools:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Grep|Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "saf-tools nudge"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "saf-tools refresh; saf-tools present"
+          },
+          {
+            "type": "command",
+            "command": "saf-tools telemetry"
+          },
+          {
+            "type": "command",
+            "command": "saf-tools init --check --warn"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "saf-tools telemetry"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "saf-tools telemetry"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "saf-tools telemetry"
+          }
+        ]
+      }
+    ]
+  }
+}

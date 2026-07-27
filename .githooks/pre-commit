@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# SAF pre-commit hook — branch discipline guard.
+#
+# The SAF method mandates: one iteration = one feat/<desc> branch; never commit on
+# main. This hook makes that rule DETERMINISTIC (it used to be only a convention left
+# to the prompt + good will). It enforces the **prohibition** (no commits on protected
+# branches), not a positive naming scheme: it does not constrain branch name patterns.
+#
+# Carve-out: during an integration operation (merge/cherry-pick/revert) the guard is
+# skipped — it is not "work on main", and SAF integration is fast-forward.
+# Detached HEAD (rebase/bisect) passes: it is not a branch you "work on".
+# Explicit, tracked override: `git commit --no-verify` (discipline is local).
+set -u
+
+# --- constants (no magic strings) ---
+readonly PROTECTED_BRANCHES="main master"
+readonly INTEGRATION_MARKERS="MERGE_HEAD CHERRY_PICK_HEAD REVERT_HEAD"
+readonly SOURCES_DIR=".saf/.sources"
+# Consumer-freeze: the deploy-written sentinel marks a CONSUMER (where the machinery is vendored);
+# the repo that DEVELOPS the kit has none, so the freeze guard below stays inert there.
+readonly KIT_SENTINEL=".saf/.kit/VERSION"
+# The vendored method machinery — frozen in a consumer, changed only by re-deploying a newer kit.
+# Editing the audit/hooks/skills would disarm the enforcement from inside: this is tamper-resistance,
+# not style. PREFIXES match any path beneath them — '.claude/skills/saf' freezes the WHOLE saf* skill
+# family (the method's third pillar, shipped per decision:029), not just 'saf/'. FILES match exactly.
+# tools/ is NOT frozen: it no longer ships as source (decision:048/050) — the consumer gets the
+# saf-tools binary, nothing under tools/ to freeze. .mcp.json left the kit with the MCP
+# retirement (decision:051); .claude/settings.json ships (hooks + allowlist) and is frozen.
+readonly FROZEN_PREFIXES=".githooks/ .claude/skills/saf"
+readonly FROZEN_FILES="saf-prompt.md .claude/settings.json"
+# Id-collision gate (decision:041): the file-backed collections + the backlog file.
+readonly ID_DIRS=".saf/.iterations .saf/.decisions .saf/.knowledge .saf/.sources"
+readonly BACKLOG_FILE=".saf/.roadmap/BACKLOG.md"
+readonly ITERATIONS_DIR=".saf/.iterations"
+
+fail() { printf 'SAF pre-commit: \342\234\227 %b\n' "$1" >&2; exit 1; }
+ok()   { printf 'SAF pre-commit: \342\234\223 %s\n' "$1" >&2; }
+
+# Source dedup guard (content-aware). A source capture must not re-register a provenance
+# already on file. Mechanical safety net on EXACT URL match only — near-duplicates (same
+# content, different URL) stay the senior's judgment (system-prompt §7, instance of §8
+# 'don't duplicate'). Fires ONLY when the commit stages new/modified markdown under
+# .saf/.sources/ (the hook stays a no-op for every other commit).
+dedup_source_provenance() {
+  local staged f url other
+  staged="$(git diff --cached --name-only --diff-filter=AM -- "$SOURCES_DIR" 2>/dev/null \
+            | grep -E '\.md$' | grep -vE '(^|/)README\.md$' || true)"
+  [ -n "$staged" ] || return 0
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    while IFS= read -r url; do
+      [ -n "$url" ] || continue
+      for other in "$SOURCES_DIR"/*.md; do
+        [ -e "$other" ] || continue
+        [ "$other" = "$f" ] && continue
+        case "$other" in */README.md) continue ;; esac
+        grep -qF -- "$url" "$other" && fail \
+"duplicate source: provenance already registered in '$other'\n    $url\n  Capture is dedup-by-provenance: extend or link the existing source, don't open a new one.\n  Explicit override (discouraged): git commit --no-verify"
+      done
+    done < <(git show ":$f" 2>/dev/null | grep -iE 'proven' | grep -oE 'https?://[^[:space:])<>]+' || true)
+  done < <(printf '%s\n' "$staged")
+}
+
+# Freeze guard: in a CONSUMER (sentinel present) refuse a commit that stages any vendored-machinery
+# path. The producer that develops the kit has no sentinel -> inert, so method development is
+# unaffected. The installed hook runs on the commit that tries to edit the hooks themselves, so the
+# guard protects itself; the only bypass is the explicit, tracked --no-verify. Fires only when the
+# staged set intersects FROZEN_PATHS (a no-op for every other commit).
+guard_frozen_machinery() {
+  [ -f "$KIT_SENTINEL" ] || return 0
+  local staged f p hit=""
+  staged="$(git diff --cached --name-only)"
+  [ -n "$staged" ] || return 0
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    for p in $FROZEN_PREFIXES; do
+      case "$f" in "$p"*) hit="$hit\n    $f" ;; esac
+    done
+    for p in $FROZEN_FILES; do
+      [ "$f" = "$p" ] && hit="$hit\n    $f"
+    done
+  done <<EOF
+$staged
+EOF
+  [ -n "$hit" ] && fail \
+"frozen method machinery edited (vendored kit $(cat "$KIT_SENTINEL" 2>/dev/null)).\n  These files ARE the SAF method — they change only by re-deploying a newer kit, never by hand in a consumer:$hit\n  A felt need to change them is upstream feedback: file a backlog 'kit-feedback' item for the kit's maintainer.\n  Explicit override (discouraged): git commit --no-verify"
+}
+
+# Id-uniqueness gate (decision:041 D1 / D4 lever 2). Refuse a commit whose working tree has two
+# nodes sharing an NNN within a collection — the silent fast-forward collision (068_a.md + 068_b.md,
+# different slugs so git never conflicts; [[type:NNN]] becomes ambiguous). Pure shell: the FLOOR,
+# no python dependency. Catches within-branch duplicates; the cross-branch window is caught by the
+# session-start audit (lever 3, mcp_server.py --refresh) + cheap renumber. Always-on (id discipline
+# is universal), unlike the branch guard it does not skip during integration.
+check_unique_ids() {
+  local dir dup
+  for dir in $ID_DIRS; do
+    [ -d "$dir" ] || continue
+    dup="$(ls "$dir" 2>/dev/null | grep -oE '^[0-9]+' | sort | uniq -d)"
+    [ -n "$dup" ] && fail \
+"duplicate id in '$dir' — NNN shared by >1 file: $(echo $dup)\n  Two nodes with the same number make [[type:NNN]] ambiguous (decision:041 id collision-free).\n  Renumber one (its record is not yet integrated): python tools/saf-graph/query.py next-id <collection>\n  Explicit override (discouraged): git commit --no-verify"
+  done
+  [ -f "$BACKLOG_FILE" ] || return 0
+  dup="$(grep -oE '^### BL-0*[0-9]+' "$BACKLOG_FILE" | grep -oE '[0-9]+$' | sort | uniq -d)"
+  [ -n "$dup" ] && fail \
+"duplicate BL id in BACKLOG.md: $(echo $dup)\n  Renumber one: python tools/saf-graph/query.py next-id BL\n  Explicit override (discouraged): git commit --no-verify"
+}
+
+# One active iteration per worktree (invariant §2.7). 'parked' is the loop's written safety
+# exit (decision:053), not active work — only a bare 'in-progress' leading Status token counts
+# (an 'in-progress (parked, blocked on X)' free-text annotation is still active, BL-034: the
+# annotation is prose, not the machine 'parked' state). Mirrors extract.status_state()'s
+# leading-token parse, pure shell (no python dependency, same floor as check_unique_ids).
+check_single_active_iteration() {
+  [ -d "$ITERATIONS_DIR" ] || return 0
+  local f token active="" count
+  # git ls-files + `git show :path` (the index blob), not a raw worktree glob + grep on
+  # disk: a file the working tree hasn't caught up with yet (or a stray untracked one
+  # the glob would also pick up) must never stand in for what git actually holds
+  # (decision:072 step 4 — same staged-vs-worktree class of bug as commit-msg).
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    token="$(git show ":$f" 2>/dev/null | grep -m1 -oE '\*\*Status:\*\*[[:space:]]*[A-Za-z][A-Za-z-]*' \
+              | sed -E 's/^\*\*Status:\*\*[[:space:]]*//')"
+    [ "$token" = "in-progress" ] && active="$active\n    $f"
+  done < <(git ls-files -- "$ITERATIONS_DIR"/*.md)
+  [ -n "$active" ] || return 0
+  count="$(printf '%b' "$active" | grep -c .)"
+  [ "$count" -gt 1 ] && fail \
+"more than one iteration in-progress in this worktree ($count):$active\n  The SAF method mandates one active iteration per worktree (invariant §2.7). Park or close the others first: python tools/saf_tools.py park --id <NNN> --trigger <token>\n  Explicit override (discouraged): git commit --no-verify"
+  return 0
+}
+
+GIT_DIR="$(git rev-parse --git-dir 2>/dev/null)" || exit 0
+
+# Id-collision gate runs before the integration carve-out: id discipline is universal.
+check_unique_ids
+check_single_active_iteration
+
+# Integration operations: not manual work on a branch -> do not guard.
+for marker in $INTEGRATION_MARKERS; do
+  [ -e "$GIT_DIR/$marker" ] && { ok "integration operation ($marker) — guard skipped"; exit 0; }
+done
+
+# Current branch; empty on detached HEAD (rebase/bisect) -> let it pass.
+branch="$(git symbolic-ref --short -q HEAD || true)"
+[ -n "$branch" ] || { ok "detached HEAD — guard skipped"; exit 0; }
+
+for protected in $PROTECTED_BRANCHES; do
+  [ "$branch" = "$protected" ] && fail \
+"commit on protected branch '$branch' blocked.\n  The SAF method mandates branch-per-iteration: open 'feat/<desc>' and commit there.\n    git switch -c feat/<description>\n  Explicit override (discouraged): git commit --no-verify"
+done
+
+# Consumer-freeze: refuse edits to the vendored method machinery (inert in the kit-developing repo).
+guard_frozen_machinery
+
+# Content-aware: refuse a source capture that duplicates an existing provenance (exact URL).
+dedup_source_provenance
+
+ok "branch '$branch' ok (not protected)"
+exit 0

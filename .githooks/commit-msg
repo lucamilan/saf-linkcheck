@@ -1,0 +1,410 @@
+#!/usr/bin/env bash
+# SAF commit-msg hook — formal validation of the commit message.
+#
+# Mechanically checks that the commit conforms to the SAF method:
+#   - exactly ONE kind (Iteration | Roadmap | Source | Chore);
+#   - required trailers present and well-formed;
+#   - Area/Nature values within the enums (Area read from CLAUDE.md: single source);
+#   - the Iteration id actually has a record file (decision:045: no CURRENT.md to cross-check).
+#
+# Also checks, on staged .saf/ files:
+#   - Status: fixed (English) vocabulary per artifact type;
+#   - Date: ISO format YYYY-MM-DD, where present.
+#
+# Source of truth: Area enum in CLAUDE.md (line "<!-- AREA_ENUM: ... -->").
+set -u
+
+MSG_FILE="$1"
+MSG="$(cat "$MSG_FILE")"
+
+# --- constants (no magic strings) ---
+readonly NATURE_ENUM="new-feature bug refactor resilience performance security docs analysis"
+# Outcome of a CLOSED analysis iteration (the E1/E2/E3 cases as a validated state).
+# E4 "parked" is not here: it is a written iteration STATUS (decision:053), not an Outcome.
+readonly OUTCOME_ENUM="backlog implemented rejected"
+# Known trailer keys (SAF kinds/fields + common git footers), lowercased. Used by
+# normalize_trailer_block to coalesce trailing trailer-only paragraphs (decision 040).
+readonly KNOWN_TRAILERS="iteration decisions area nature roadmap source co-authored-by signed-off-by acked-by reviewed-by reported-by tested-by suggested-by cc"
+readonly CLAUDE_MD="CLAUDE.md"
+readonly ITER_DIR=".saf/.iterations"
+readonly DECISION_DIR=".saf/.decisions"
+readonly KNOWLEDGE_DIR=".saf/.knowledge"
+readonly SOURCE_DIR=".saf/.sources"
+readonly ROADMAP_DIR=".saf/.roadmap"
+# CONTEXT_FILE/CONTEXT_STATUS (CURRENT.md) retired by decision:045 — the present is a derived
+# view of the in-progress records, not an authored artifact the hook validates.
+# State vocabularies (English, fixed) per artifact type.
+readonly ITER_STATUS="in-progress parked pending-review closed"
+readonly DECISION_STATUS="accepted superseded"
+readonly KNOWLEDGE_STATUS="candidate confirmed promoted retired"
+readonly SOURCE_STATUS="raw distilled"
+readonly ISO_DATE='^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+# Cognitive graph: addressable nodes + typed edges (decision 007).
+# Valid node syntax: [[<type>:NNN]] (closed type, 3 digits) or [[BL-NNN]].
+readonly NODE_TYPES="decision iteration knowledge source"
+readonly NODE_REF='^(decision|iteration|knowledge|source):[0-9]{3}$|^BL-[0-9]{3}$'
+# AUTHORED edge vocabulary: "edge|domains|range" (comma-separated sets).
+# Derived edges (applies, inverses like distilled-from) are not written -> not
+# allowed here: anything outside the authored vocabulary is rejected.
+readonly EDGE_RULES="supersedes|decision|decision
+extends|decision|decision
+delivered-by|decision|iteration
+informed-by|decision|knowledge
+learned-from|knowledge|iteration
+distilled-into|source|knowledge,decision"
+
+# --- telemetry signal (iteration:193, opt-in via SAF_TELEMETRY=1, never blocks the gate) ---
+# A reject here is the `commit-gate-reject` feedback_emitted; ANY successful exit from
+# this hook resolves it (and any oracle-fail riding the same fix) as `persisted` — a
+# commit-msg PASS is the moment the fix actually lands. Guarded on the env var in bash,
+# before ever spawning python, so an opted-out clone pays nothing extra per commit.
+_SAF_PY=""
+_saf_signal() {
+  [ "${SAF_TELEMETRY:-}" = "1" ] || return 0
+  [ -n "$_SAF_PY" ] || _SAF_PY="$(command -v python3 || command -v python || command -v py || true)"
+  [ -n "$_SAF_PY" ] || return 0
+  "$_SAF_PY" tools/saf_tools.py signal "$@" >/dev/null 2>&1 || true
+}
+
+fail() {
+  printf 'SAF commit-msg: \342\234\227 %b\n' "$1" >&2
+  _saf_signal --kind commit-gate-reject --stage feedback_emitted
+  exit 1
+}
+ok()   { printf 'SAF commit-msg: \342\234\223 %s\n' "$1" >&2; }
+
+# --- staged-content integrity (decision:072 step 4) ---
+# Every validation below must read what THIS COMMIT will actually contain — the git
+# INDEX blob for a path — never the live working-tree copy: a partially-staged file
+# (`git add -p`), a stray unstaged edit, or a stash artifact can leave the worktree
+# saying something different from what's about to be committed, and a worktree read
+# would validate the wrong content. A temp copy of the index blob stands in for the
+# real path in every content read below; fail messages still name the real path.
+_SAF_TMP_CONTENT_DIR="$(mktemp -d)"
+_saf_on_exit() {
+  local rc=$?
+  rm -rf "$_SAF_TMP_CONTENT_DIR"
+  [ "$rc" -eq 0 ] && _saf_signal --stage persisted
+  return 0
+}
+trap _saf_on_exit EXIT
+
+indexed_copy() {
+  local f="$1" tmp
+  tmp="$(mktemp "$_SAF_TMP_CONTENT_DIR/XXXXXX")"
+  git show ":$f" > "$tmp" 2>/dev/null || cp "$f" "$tmp" 2>/dev/null || : > "$tmp"
+  printf '%s' "$tmp"
+}
+
+# The TRAILER BLOCK = the last paragraph (run of non-blank lines at the end of the message),
+# per git's own convention: trailers are the final block, separated from the body by a blank
+# line. Parsing trailers only here stops a prose line that begins with 'Key:' from forging a
+# phantom trailer (e.g. a bogus second kind). [iteration 022]
+msg_trailer_block() {
+  printf '%s\n' "$MSG" | awk '
+    { a[NR]=$0 }
+    END {
+      last=NR;   while (last>0   && a[last]    ~ /^[ \t\r]*$/) last--
+      start=last; while (start>1 && a[start-1] !~ /^[ \t\r]*$/) start--
+      for (i=start; i<=last; i++) print a[i]
+    }'
+}
+
+# Extracts the value of a "Key: value" trailer (first occurrence in the block), without CR.
+trailer() { msg_trailer_block | grep -E "^$1:[[:space:]]*" | head -n1 | sed -E "s/^$1:[[:space:]]*//" | tr -d '\r'; }
+
+# Coalesces trailing trailer-only paragraphs into a single block (decision 040). Authors (and
+# agents) often separate a footer like 'Co-Authored-By' from the SAF trailers with a blank line;
+# git's convention then sees only the last paragraph and the kind (Iteration/Roadmap/Source)
+# vanishes. We merge consecutive trailing paragraphs across blank gaps AS LONG AS every non-blank
+# line in BOTH is a KNOWN trailer — a prose line stops the merge, so the body stays immune
+# (iteration 022). Emits the normalized message on stdout; the caller writes it back.
+normalize_trailer_block() {
+  printf '%s\n' "$MSG" | awk -v keys="$KNOWN_TRAILERS" '
+    function is_blank(s){ return s ~ /^[ \t\r]*$/ }
+    function all_known(lo,hi,   j,low,k,hit){
+      for(j=lo;j<=hi;j++){
+        if(is_blank(a[j])) continue
+        low=tolower(a[j]); hit=0
+        for(k in K) if(low ~ ("^" k ":[ \t]")) { hit=1; break }
+        if(!hit) return 0
+      }
+      return 1
+    }
+    BEGIN{ m=split(keys,arr," "); for(i=1;i<=m;i++) K[arr[i]]=1 }
+    { a[NR]=$0 }
+    END{
+      n=NR
+      last=n; while(last>0 && is_blank(a[last])) last--
+      if(last>0){
+        i=last
+        while(1){
+          ps=i; while(ps>1 && !is_blank(a[ps-1])) ps--   # start of current final paragraph
+          if(!all_known(ps,i)) break
+          b=ps-1; while(b>0 && is_blank(a[b])) b--        # last line of the paragraph above
+          if(b<1) break
+          qs=b; while(qs>1 && !is_blank(a[qs-1])) qs--    # start of that paragraph
+          if(!all_known(qs,b)) break                      # prose above -> stop (iter 022)
+          for(k=b+1;k<=ps-1;k++) drop[k]=1                # remove the blank separator(s)
+          i=b
+        }
+      }
+      for(idx=1;idx<=n;idx++) if(!(idx in drop)) print a[idx]
+    }'
+}
+
+# Every CSV/space-separated token of $1 must be contained in enum $2.
+validate_enum() {
+  local vals enum label v
+  vals="$(printf '%s' "$1" | tr ',' ' ')"; enum="$2"; label="$3"
+  for v in $vals; do
+    case " $enum " in *" $v "*) : ;; *) fail "$label '$v' not in enum: [$enum]";; esac
+  done
+}
+
+# Extracts the first token after "**Field:**" from a file.
+field() { grep -E -m1 "\*\*$2:\*\*" "$1" | sed -E "s/.*\*\*$2:\*\*[[:space:]]*//; s/[[:space:]].*$//" | tr -d '\r'; }
+
+# Every node reference [[...]] must be [[<type>:NNN]] or [[BL-NNN]] (no bare/ambiguous links).
+# Unresolved links stay valid (forward link = future work): the FORM is validated, not existence.
+# $1 = display path (for messages), $2 = content path (staged blob — decision:072 step 4).
+validate_node_refs() {
+  local file="$1" content="$2" tok inner
+  while IFS= read -r tok; do
+    [ -z "$tok" ] && continue
+    inner="$(printf '%s' "$tok" | sed -E 's/^\[\[//; s/\]\]$//')"
+    printf '%s' "$inner" | grep -Eq "$NODE_REF" \
+      || fail "$file: malformed/ambiguous node reference '[[${inner}]]' — expected [[<type>:NNN]] or [[BL-NNN]]"
+  done <<EOF
+$(grep -oE '\[\[[^]]*\]\]' "$content" 2>/dev/null || true)
+EOF
+}
+
+# Validates the "## Relations" block: edges in the authored vocabulary + domain->range constraints.
+# $1 = display path, $2 = ntype, $3 = content path (staged blob — decision:072 step 4).
+validate_relations() {
+  local file="$1" ntype="$2" content="$3" line edge target ttype rule domains ranges
+  # Iterations: derived edges (applies from the trailer, delivers inverse) -> no authored block.
+  if [ "$ntype" = "iteration" ] && grep -Eq '^## Relations' "$content"; then
+    fail "$file: iterations carry no '## Relations' (edges are derived, not authored)"
+  fi
+  while IFS= read -r line; do
+    case "$line" in "- "*) : ;; *) continue;; esac
+    printf '%s' "$line" | grep -q '\[\[' || continue
+    edge="$(printf '%s' "$line" | sed -E 's/^- *([^ ]+).*/\1/')"
+    target="$(printf '%s' "$line" | grep -oE '\[\[[^]]*\]\]' | head -n1 | sed -E 's/^\[\[//; s/\]\]$//')"
+    ttype="$(printf '%s' "$target" | sed -E 's/:.*$//')"
+    rule="$(printf '%s\n' "$EDGE_RULES" | grep -E "^${edge}\|" || true)"
+    [ -n "$rule" ] || fail "$file: edge '$edge' not in the authored vocabulary"
+    domains="$(printf '%s' "$rule" | cut -d'|' -f2)"
+    ranges="$(printf '%s' "$rule" | cut -d'|' -f3)"
+    case ",$domains," in *",$ntype,"*) : ;; *) fail "$file: edge '$edge' not allowed on node '$ntype' (domain: $domains)";; esac
+    case ",$ranges," in *",$ttype,"*) : ;; *) fail "$file: edge '$edge' -> target type '$ttype' out of range ($ranges)";; esac
+  done <<EOF
+$(sed -n '/^## Relations/,/^## /p' "$content")
+EOF
+}
+
+# Semantic coherence Status x Nature x links (decisions 010, 012) — method
+# guaranteed by the hook, not by prose:
+#  - C3: every decision carries the origin 'delivered-by -> [[iteration:NNN]]' (source).
+#  - C2: a CLOSED analysis iteration carries a valid Outcome + the link the Outcome
+#        requires (E1 backlog / E2 implemented / E3 rejected). A non-closed analysis
+#        (in-progress or parked, decision:053): no Outcome required.
+#  - C5: a CLOSED iteration carries '**Lesson:**' (closing gate, even "none").
+#  (C6 'CURRENT -> idle on close' retired by decision:045: the present is a derived view of the
+#   in-progress records, not an authored CURRENT.md — there is no shared file to return to idle.)
+# $1 = display path, $2 = ntype, $3 = status, $4 = content path (staged blob — decision:072 step 4).
+validate_coherence() {
+  local file="$1" ntype="$2" st="$3" content="$4" es
+  if [ "$ntype" = "decision" ]; then
+    grep -Eq 'delivered-by.*\[\[iteration:[0-9]{3}\]\]' "$content" \
+      || fail "$file: decision without origin — missing edge 'delivered-by -> [[iteration:NNN]]'"
+  fi
+  # C5 — closing gate: a closed iteration carries a Lesson. (C6 'CURRENT -> idle' retired by
+  # decision:045 — the present is derived from the in-progress records; no CURRENT to idle,
+  # so closing while other iterations are parked no longer needs --no-verify.)
+  if [ "$ntype" = "iteration" ] && [ "$st" = "closed" ]; then
+    grep -Eq '\*\*Lesson:\*\*' "$content" \
+      || fail "$file: closed iteration without '**Lesson:**' (closing gate — even 'none — reason')"
+  fi
+  if [ "$ntype" = "iteration" ] && grep -Eq '\*\*Nature:\*\*.*analysis' "$content"; then
+    if [ "$st" = "closed" ]; then
+      es="$(field "$content" Outcome)"
+      [ -n "$es" ] || fail "$file: closed analysis without '**Outcome:**' (expected [$OUTCOME_ENUM])"
+      case " $OUTCOME_ENUM " in *" $es "*) : ;; *) fail "$file: Outcome '$es' invalid — expected [$OUTCOME_ENUM]";; esac
+      case "$es" in
+        backlog)     grep -Eq '\[\[BL-[0-9]{3}\]\]' "$content" \
+                       || fail "$file: Outcome 'backlog' \342\207\222 missing a [[BL-NNN]] reference";;
+        implemented) grep -Eq '\[\[decision:[0-9]{3}\]\]' "$content" \
+                       || grep -Eq '\*\*Nature:\*\*.*(new-feature|bug|refactor|resilience|performance|security)' "$content" \
+                       || fail "$file: Outcome 'implemented' \342\207\222 missing [[decision:NNN]] or a change nature";;
+        rejected)    grep -Eq '\[\[(decision|knowledge):[0-9]{3}\]\]' "$content" \
+                       || fail "$file: Outcome 'rejected' \342\207\222 missing [[decision:NNN]] or [[knowledge:NNN]]";;
+      esac
+    fi
+  fi
+}
+
+# Validates Status (per type) and Date (ISO, where present) on staged .saf/ artifacts.
+# Every read here goes through indexed_copy: $file names the path for messages, $content
+# is the STAGED blob (decision:072 step 4) — never the worktree copy.
+validate_artifacts() {
+  local file base allowed ntype st dt content
+  while IFS= read -r file; do
+    [ -z "$file" ] && continue
+    case "$file" in .saf/*) : ;; *) continue;; esac
+    base="$(basename "$file")"
+    [ "$base" = "README.md" ] && continue
+    [ -f "$file" ] || continue
+    content="$(indexed_copy "$file")"
+    allowed=""; ntype=""
+    case "$file" in
+      "$ITER_DIR"/*)      allowed="$ITER_STATUS";     ntype="iteration";;
+      "$DECISION_DIR"/*)  allowed="$DECISION_STATUS"; ntype="decision";;
+      "$KNOWLEDGE_DIR"/*) allowed="$KNOWLEDGE_STATUS";ntype="knowledge";;
+      "$SOURCE_DIR"/*)    allowed="$SOURCE_STATUS";   ntype="source";;
+    esac
+    if [ -n "$allowed" ]; then
+      st="$(field "$content" Status)"
+      [ -n "$st" ] || fail "$file: missing '**Status:**' field"
+      case " $allowed " in *" $st "*) : ;; *) fail "$file: Status '$st' invalid — expected [$allowed]";; esac
+    fi
+    if grep -Eq '\*\*Date:\*\*' "$content"; then
+      dt="$(field "$content" Date)"
+      printf '%s' "$dt" | grep -Eq "$ISO_DATE" || fail "$file: Date '$dt' invalid — expected YYYY-MM-DD"
+    fi
+    # Graph: node syntax (everywhere) + typed edges (graph nodes only).
+    validate_node_refs "$file" "$content"
+    [ -n "$ntype" ] && validate_relations "$file" "$ntype" "$content"
+    # Semantic coherence (C2/C3): Outcome of closed analyses, origin of decisions.
+    [ -n "$ntype" ] && validate_coherence "$file" "$ntype" "$st" "$content"
+  done <<EOF
+$staged
+EOF
+}
+
+# --- skip merges (this repo uses fast-forward, but just in case) ---
+case "$MSG" in "Merge "*) ok "merge commit — skip"; exit 0;; esac
+
+# --- normalize: coalesce trailing trailer-only paragraphs, then rewrite (decision 040) ---
+NORMALIZED="$(normalize_trailer_block)"
+if [ "$NORMALIZED" != "$MSG" ]; then
+  printf '%s\n' "$NORMALIZED" > "$MSG_FILE"
+  MSG="$NORMALIZED"
+  ok "trailer block normalized (coalesced separated trailers)"
+fi
+
+ITERATION="$(trailer Iteration)"; ITERATION="${ITERATION%$'\r'}"
+ROADMAP="$(trailer Roadmap)";     ROADMAP="${ROADMAP%$'\r'}"
+SOURCE="$(trailer Source)";       SOURCE="${SOURCE%$'\r'}"
+CHORE="$(trailer Chore)";         CHORE="${CHORE%$'\r'}"
+AREA="$(trailer Area)"
+NATURE="$(trailer Nature)"
+DECISIONS="$(trailer Decisions)"
+
+# --- single kind ---
+have_iter=0;   [ -n "$ITERATION" ] && have_iter=1
+have_road=0;   [ -n "$ROADMAP" ]   && have_road=1
+have_source=0; [ -n "$SOURCE" ]    && have_source=1
+have_chore=0;  [ -n "$CHORE" ]     && have_chore=1
+[ $((have_iter + have_road + have_source + have_chore)) -eq 1 ] || \
+  fail "expected exactly ONE kind: 'Iteration: NNN', 'Roadmap: BL-NNN', 'Source: NNN' or 'Chore: <desc>'"
+
+staged="$(git diff --cached --name-only)"
+
+# --- artifact validation (Status/Date) for any kind ---
+validate_artifacts
+
+# --- Roadmap kind (backlog) ---
+if [ "$have_road" -eq 1 ]; then
+  printf '%s' "$ROADMAP" | grep -Eq '^BL-[0-9]{3}([, ]+BL-[0-9]{3})*$' \
+    || fail "Roadmap: expected 'BL-NNN' (e.g. BL-001)"
+  out="$(printf '%s\n' "$staged" | grep -v "^$ROADMAP_DIR/" || true)"
+  [ -z "$out" ] || fail "Roadmap commit must touch only $ROADMAP_DIR/ — out of scope:\n$out"
+  ok "Roadmap commit valid ($ROADMAP)"
+  exit 0
+fi
+
+# --- Source kind (raw capture, decision 018) ---
+# Pure capture, sibling of Roadmap: touches ONLY .saf/.sources/, no Iteration/Area/Nature.
+# 'Status: raw' is checked by validate_artifacts above. Provenance is NOT checked here: it is
+# required by the RAIL at composition (contract [records.source] frontmatter), which is where a
+# source is born — the hook would only re-litigate it, and would break records written before
+# the field was declared. The 'distilled-into' edge is authored later (at distillation), so a
+# raw source carries no ## Relations block.
+if [ "$have_source" -eq 1 ]; then
+  printf '%s' "$SOURCE" | grep -Eq '^[0-9]{3}([, ]+[0-9]{3})*$' \
+    || fail "Source: expected a 3-digit id (e.g. 005), found: '$SOURCE'"
+  out="$(printf '%s\n' "$staged" | grep -v "^$SOURCE_DIR/" || true)"
+  [ -z "$out" ] || fail "Source commit must touch only $SOURCE_DIR/ — out of scope:\n$out"
+  ok "Source commit valid ($SOURCE)"
+  exit 0
+fi
+
+# --- Chore kind (mechanical/non-cognitive commit, iter:150) ---
+# Inverse of Roadmap/Source: those LOCK staged paths to a .saf/ subdir, this one
+# EXCLUDES .saf/ entirely — a Chore carries no cognition, so it must not touch the graph.
+if [ "$have_chore" -eq 1 ]; then
+  out="$(printf '%s\n' "$staged" | grep -E "^\.saf/" || true)"
+  [ -z "$out" ] || fail "Chore commit must not touch .saf/ — out of scope (belongs to Iteration/Roadmap/Source):\n$out"
+  # decision:073 — a Chore lands OUTSIDE any bracket. With an iteration in progress the
+  # bracket's commit-set stops being recoverable ("one iteration = one commit-set").
+  inprog="$(grep -lE '^-[[:space:]]+\*\*Status:\*\*[[:space:]]+in-progress' "$ITER_DIR"/*.md 2>/dev/null || true)"
+  [ -z "$inprog" ] || fail "Chore refused — an iteration is in progress (commit under its 'Iteration:' trailer, or close it first):\n$inprog"
+  ok "Chore commit valid"
+  exit 0
+fi
+
+# --- Iteration kind ---
+printf '%s' "$ITERATION" | grep -Eq '^[0-9]{3}$' \
+  || fail "Iteration: expected a 3-digit id (e.g. 001), found: '$ITERATION'"
+
+[ -n "$AREA" ]   || fail "missing 'Area:' trailer (\342\211\2651 value)"
+[ -n "$NATURE" ] || fail "missing 'Nature:' trailer (\342\211\2651 value)"
+
+AREA_ENUM="$(grep -E '^<!--[[:space:]]*AREA_ENUM:' "$CLAUDE_MD" 2>/dev/null \
+  | sed -E 's/^<!--[[:space:]]*AREA_ENUM:[[:space:]]*//; s/[[:space:]]*-->.*$//')"
+[ -n "$AREA_ENUM" ] || fail "AREA_ENUM not found in $CLAUDE_MD (line '<!-- AREA_ENUM: ... -->' in ## Project)"
+
+validate_enum "$AREA"   "$AREA_ENUM"   "Area"
+validate_enum "$NATURE" "$NATURE_ENUM" "Nature"
+
+if [ -n "$DECISIONS" ]; then
+  printf '%s' "$DECISIONS" | grep -Eq '^[0-9]{3}([, ]+[0-9]{3})*$' \
+    || fail "Decisions: expected 'NNN' comma-separated"
+fi
+
+# --- coherence: the Iteration id must actually have a record (decision:045: no CURRENT to
+# cross-check against — the record file is the single source). git ls-files (not a raw `ls`
+# on the directory) so a stray untracked worktree file matching the name pattern can never
+# stand in for the real record (decision:072 step 4). ---
+iter_file="$(git ls-files -- "$ITER_DIR/${ITERATION}_*.md" | head -n1)"
+[ -n "$iter_file" ] || \
+  fail "Iteration $ITERATION has no record: $ITER_DIR/${ITERATION}_*.md absent"
+iter_content="$(indexed_copy "$iter_file")"
+
+# --- parked guard (decision:053): a parked bracket refuses work. A commit citing a
+# parked iteration fails UNLESS it stages the record itself — the park/resume/close
+# transition is that commit; anything else must resume first (saf-tools resume). ---
+iter_status="$(field "$iter_content" Status)"
+if [ "$iter_status" = "parked" ]; then
+  printf '%s\n' "$staged" | grep -qxF "$iter_file" \
+    || fail "Iteration $ITERATION is parked — resume it (saf-tools resume --id $ITERATION) before committing work"
+fi
+
+# The trailer Area/Nature must each be a value the iteration record itself declares —
+# matched against the record's own **Area:**/**Nature:** field, not a raw substring
+# search over the whole file (decision:072 step 4: a Nature mismatch was never checked
+# at all, and the Area check could match unrelated prose).
+iter_area="$(field "$iter_content" Area)"
+iter_nature="$(field "$iter_content" Nature)"
+for v in $(printf '%s' "$AREA" | tr ',' ' '); do
+  case ",$iter_area," in *",$v,"*) : ;; *) fail "Area '$v' in commit but not in iteration $iter_file (Area: $iter_area)";; esac
+done
+for v in $(printf '%s' "$NATURE" | tr ',' ' '); do
+  case ",$iter_nature," in *",$v,"*) : ;; *) fail "Nature '$v' in commit but not in iteration $iter_file (Nature: $iter_nature)";; esac
+done
+
+ok "Iteration commit valid (iter $ITERATION, Area: $AREA, Nature: $NATURE)"
+exit 0

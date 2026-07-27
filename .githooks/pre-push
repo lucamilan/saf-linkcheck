@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# SAF pre-push hook — id-uniqueness gate at the source (BL-036, decision:041 D1).
+#
+# pre-commit's check_unique_ids guards the WORKTREE: it catches within-branch duplicates.
+# The cross-branch window stays open there — two branches, each clean in isolation, both
+# allocate the same NNN; the local merge never conflicts (different slugs), and the
+# duplicate reaches the remote silently. This hook closes that window at the last local
+# gate: every pushed ref's TREE is scanned (git ls-tree, not the worktree — you can push
+# a branch you are not on), pure shell + git plumbing, no python dependency.
+#
+# Explicit, tracked override: `git push --no-verify` (discipline is local).
+
+set -u
+
+fail() { printf 'SAF pre-push: \xe2\x9c\x97 %b\n' "$1" >&2; exit 1; }
+ok()   { printf 'SAF pre-push: \xe2\x9c\x93 %s\n'  "$1" >&2; }
+
+ID_DIRS=".saf/.decisions .saf/.iterations .saf/.knowledge .saf/.sources"
+BACKLOG_PATH=".saf/.roadmap/BACKLOG.md"
+ZERO=0000000000000000000000000000000000000000
+
+checked=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$ZERO" ] && continue  # ref deletion: nothing to scan
+  checked=1
+  for dir in $ID_DIRS; do
+    dup="$(git ls-tree -r --name-only "$local_sha" -- "$dir" 2>/dev/null \
+           | sed 's|.*/||' | grep -oE '^[0-9]+' | sort | uniq -d)"
+    [ -n "$dup" ] && fail \
+"duplicate id in '$dir' @ ${local_ref} — NNN shared by >1 file: $(echo $dup)\n  Two nodes with the same number make [[type:NNN]] ambiguous (decision:041 id collision-free).\n  Renumber one before pushing: saf-tools next-id <collection>\n  Explicit override (discouraged): git push --no-verify"
+  done
+  dup="$(git show "$local_sha:$BACKLOG_PATH" 2>/dev/null \
+         | grep -oE '^### BL-0*[0-9]+' | grep -oE '[0-9]+$' | sort | uniq -d)"
+  [ -n "$dup" ] && fail \
+"duplicate BL id in BACKLOG.md @ ${local_ref}: $(echo $dup)\n  Renumber one before pushing: saf-tools next-id BL\n  Explicit override (discouraged): git push --no-verify"
+done
+
+[ "$checked" -eq 1 ] && ok "pushed trees id-clean"
+exit 0
