@@ -32,6 +32,6 @@ Only after the senior approves a plan-decision (`## Piano (loop)`, form via `des
 2. Persist result — a closed analysis needs a valid `Outcome` — required links (in a `## Relations` block where the type carries one) and `Lesson:` through `close`/`record` commands.
 3. Before writing, check each authored edge for coherence: right side (authored once, on its natural side), type in range, target resolvable and current. A wrong edge is silent — the graph answers, just wrongly.
 4. Use `saf-tools describe` to compose valid trailers and keep commit kinds separate: iteration, backlog or source capture.
-5. Refresh after the write so retrieval sees the new state.
+5. Do not refresh after the write: the read path freshens the indices on demand, so the next `recall`/`code` sees the new state and pays for it once, whatever the write count.
 
 Multiline content uses stdin or file options. Hooks are the final safety net, not a substitute for these gates.

@@ -71,6 +71,22 @@ guard_frozen_machinery() {
   local staged f p hit=""
   staged="$(git diff --cached --name-only)"
   [ -n "$staged" ] || return 0
+  # Deploy carve-out (iter:223): an UPGRADE rewrites the frozen machinery legitimately —
+  # `saf-tools init --force` is what the kit itself prescribes. Without this, the only
+  # operation the freeze must allow was the one it blocked, and --no-verify became the
+  # ordinary way to upgrade. The discriminator is the sentinel: an upgrade stamps a NEW
+  # kit version into it (staged, value changed vs HEAD); a hand-edit of the machinery
+  # does not. Deterministic, shell-only, and it does not widen the guard — editing
+  # frozen files without bumping the sentinel is still refused.
+  if printf '%s\n' "$staged" | grep -qxF "$KIT_SENTINEL"; then
+    local staged_v head_v
+    staged_v="$(git show ":$KIT_SENTINEL" 2>/dev/null | tr -d '\r\n')"
+    head_v="$(git show "HEAD:$KIT_SENTINEL" 2>/dev/null | tr -d '\r\n')"
+    [ -n "$staged_v" ] && [ "$staged_v" != "$head_v" ] && {
+      ok "kit upgrade ($head_v -> $staged_v) — freeze guard skipped"
+      return 0
+    }
+  fi
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     for p in $FROZEN_PREFIXES; do

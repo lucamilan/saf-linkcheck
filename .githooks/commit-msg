@@ -24,13 +24,18 @@ readonly NATURE_ENUM="new-feature bug refactor resilience performance security d
 readonly OUTCOME_ENUM="backlog implemented rejected"
 # Known trailer keys (SAF kinds/fields + common git footers), lowercased. Used by
 # normalize_trailer_block to coalesce trailing trailer-only paragraphs (decision 040).
-readonly KNOWN_TRAILERS="iteration decisions area nature roadmap source co-authored-by signed-off-by acked-by reviewed-by reported-by tested-by suggested-by cc"
+# Some of these double as Conventional Commits type prefixes (`chore:`, `source:`), so a
+# subject line can LOOK like a trailer — the coalescing guards line 1 for exactly that.
+readonly KNOWN_TRAILERS="iteration decisions area nature roadmap source chore co-authored-by signed-off-by acked-by reviewed-by reported-by tested-by suggested-by cc"
 readonly CLAUDE_MD="CLAUDE.md"
 readonly ITER_DIR=".saf/.iterations"
 readonly DECISION_DIR=".saf/.decisions"
 readonly KNOWLEDGE_DIR=".saf/.knowledge"
 readonly SOURCE_DIR=".saf/.sources"
 readonly ROADMAP_DIR=".saf/.roadmap"
+# Deploy machinery, not cognition: the sentinel `saf-tools init` stamps with the installed
+# kit version. Under .saf/ by layout only — it is the one .saf/ path a Chore may carry.
+readonly KIT_DIR=".saf/.kit/"
 # CONTEXT_FILE/CONTEXT_STATUS (CURRENT.md) retired by decision:045 — the present is a derived
 # view of the in-progress records, not an authored artifact the hook validates.
 # State vocabularies (English, fixed) per artifact type.
@@ -144,6 +149,7 @@ normalize_trailer_block() {
           b=ps-1; while(b>0 && is_blank(a[b])) b--        # last line of the paragraph above
           if(b<1) break
           qs=b; while(qs>1 && !is_blank(a[qs-1])) qs--    # start of that paragraph
+          if(qs<=1) break                                 # that paragraph IS the subject
           if(!all_known(qs,b)) break                      # prose above -> stop (iter 022)
           for(k=b+1;k<=ps-1;k++) drop[k]=1                # remove the blank separator(s)
           i=b
@@ -345,8 +351,13 @@ fi
 # --- Chore kind (mechanical/non-cognitive commit, iter:150) ---
 # Inverse of Roadmap/Source: those LOCK staged paths to a .saf/ subdir, this one
 # EXCLUDES .saf/ entirely — a Chore carries no cognition, so it must not touch the graph.
+# One carve-out: $KIT_DIR (the deploy sentinel `saf-tools init` stamps). It lives under
+# .saf/ by layout, but it is not cognition — no node, no edge, nothing a session recalls:
+# it is the committed record of WHICH kit is installed. Excluding it left the kit's own
+# prescribed upgrade (`init --force`, decision:052) with no kind that accepts it, so
+# --no-verify became the ordinary way to upgrade (iter:223).
 if [ "$have_chore" -eq 1 ]; then
-  out="$(printf '%s\n' "$staged" | grep -E "^\.saf/" || true)"
+  out="$(printf '%s\n' "$staged" | grep -E "^\.saf/" | grep -vE "^$KIT_DIR" || true)"
   [ -z "$out" ] || fail "Chore commit must not touch .saf/ — out of scope (belongs to Iteration/Roadmap/Source):\n$out"
   # decision:073 — a Chore lands OUTSIDE any bracket. With an iteration in progress the
   # bracket's commit-set stops being recoverable ("one iteration = one commit-set").

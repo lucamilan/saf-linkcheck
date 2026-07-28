@@ -22,7 +22,7 @@ When a question might be settled by current code rather than by prior decisions 
 X already work like Y", "is this implemented"), pass `--scope code` or `--scope all`
 explicitly, or run a separate code search — a cognition-only miss is not "nothing pertinent".
 
-For relations between symbols, `code callers|calls|impact|path` beats any text search: they
+For relations between symbols, `code callers|calls|impact|path|hubs` beats any text search: they
 resolve over the call graph, so `no callers found` is an **answer** (nothing calls it), not a
 miss to double-check by grepping. Use `recall --scope code` to locate a concept, the `code`
 reports to qualify it — is this dead, who breaks if I change it — and grep only to anchor an
