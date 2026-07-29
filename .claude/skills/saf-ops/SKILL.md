@@ -28,7 +28,7 @@ miss to double-check by grepping. Use `recall --scope code` to locate a concept,
 reports to qualify it — is this dead, who breaks if I change it — and grep only to anchor an
 exact string or to reach what the index does not cover.
 
-Do not guess a verb's semantics from its name: `backlog` is a **write**-rail verb (composes a new BL entry, requires `--id`/`--title`), not a list/read query — it is deliberately absent from the query list above. To enumerate backlog entries, read `.saf/.roadmap/BACKLOG.md` directly, or run `saf-tools describe --type backlog` / `saf-tools <verb> --help` before invoking an unfamiliar verb.
+`backlog` carries both halves: bare it **lists** the registered entries (`--all` to reach the terminal archive too), and with `--id`/`--title` it composes a new one on the write rail. Enumerate the negative space through the verb, never by reading the backlog file — the raw read is the anchoring stage, not the way to ask what is open. For any other unfamiliar verb, `saf-tools describe --type T` / `<verb> --help` before invoking it: a verb's name does not settle whether it reads or writes.
 
 ## health
 Read-only operational snapshot. Lead with `healthy`, `degraded` or `attention`, based on:

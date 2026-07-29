@@ -15,9 +15,18 @@ Routine lifecycle queries use `describe --type <T> --compact` (location, id verb
 
 ## Open (§4.1)
 1. Query history and classify the request as new surface, follow-up, or documentation-only correction.
-2. Propose a lane, starting from the project default (`describe --type iteration` prints it, read from the host `CLAUDE.md`): `chore` (no record — commit under the chore kind, refused while an iteration is in progress), `fast` (record deferred to close) or `complex`. Boundary test: is there a choice or a lesson a future session must recover? For `fast`/`complex` also propose purpose, branch, `Area`, `Nature` and oracle; the senior disposes, and may raise or lower the default per bracket.
+2. Propose a lane, starting from the project default (`describe --type iteration` prints it, read from the host `CLAUDE.md`): `chore` (no record — commit under the chore kind), `fast` (record deferred to close) or `complex`. Boundary test: is there a choice or a lesson a future session must recover? For `fast`/`complex` also propose purpose, branch, `Area`, `Nature` and oracle; the senior disposes, and may raise or lower the default per bracket.
 3. Create a dedicated non-`main` branch, allocate with `next-id` (only after the senior disposes), and open through the rail.
 4. For analysis, inspect pertinent registered sources.
+
+**A `chore` needs no round-trip.** When the boundary test answers "no choice, no lesson", that
+answer *is* the disposition: commit under the chore kind and move on — no ID, no record, no
+confirmation asked. Asking for one reinstates the ceremony the lane exists to remove. What still
+binds is the branch (never `main`) and the escalation: the moment a choice or a lesson surfaces it
+becomes an iteration *before* the commit. Two contract limits decide where a chore lands, and
+neither is a reason to open a bracket: it never touches `.saf/` (hygiene inside it commits under
+its own kind, `Roadmap:` for the backlog; the `.saf/.kit/` sentinel is the one carve-out), and it
+is refused while an iteration is in progress.
 
 ## Work (§4.2)
 - Stay within purpose and validate the owed output.

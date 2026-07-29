@@ -168,8 +168,29 @@ validate_enum() {
   done
 }
 
-# Extracts the first token after "**Field:**" from a file.
+# Extracts the first token after "**Field:**" from a file. Single-token fields only
+# (Status, Date, Outcome) — for the list fields use field_list, not this.
 field() { grep -E -m1 "\*\*$2:\*\*" "$1" | sed -E "s/.*\*\*$2:\*\*[[:space:]]*//; s/[[:space:]].*$//" | tr -d '\r'; }
+
+# Same, for the arity->=1 list fields (Area, Nature): keeps the WHOLE value and normalizes it to
+# space-separated tokens, so the readable "prompt, method, meta" and the compact "prompt,method"
+# both read alike. field() truncating at the first space silently dropped every entry after the
+# first (BL-072) — the record composes the readable form, so the check never saw it.
+field_list() { grep -E -m1 "\*\*$2:\*\*" "$1" | sed -E "s/.*\*\*$2:\*\*[[:space:]]*//; s/[[:space:],]+/ /g; s/ *$//" | tr -d '\r'; }
+
+# Blanks out markdown code — fenced blocks and BALANCED inline spans — leaving prose. A [[...]]
+# inside code is code, not a citation (decision:084): a POSIX character class such as the one
+# this very hook uses in its own sed is not a malformed reference, and a record may finally SHOW
+# the citation form the method teaches. Twin of strip_code() in the engine's extract.py, same
+# conservative rule on a span that wraps across lines (odd backtick count on the line: left
+# intact, so mispaired delimiters can never swallow a real citation).
+strip_code() {
+  awk '
+    /^[ \t]*(```|~~~)/ { fence = !fence; print ""; next }
+    fence              { print ""; next }
+    { if (gsub(/`/, "`") % 2 == 0) gsub(/`[^`]*`/, " "); print }
+  ' "$1"
+}
 
 # Every node reference [[...]] must be [[<type>:NNN]] or [[BL-NNN]] (no bare/ambiguous links).
 # Unresolved links stay valid (forward link = future work): the FORM is validated, not existence.
@@ -182,7 +203,7 @@ validate_node_refs() {
     printf '%s' "$inner" | grep -Eq "$NODE_REF" \
       || fail "$file: malformed/ambiguous node reference '[[${inner}]]' — expected [[<type>:NNN]] or [[BL-NNN]]"
   done <<EOF
-$(grep -oE '\[\[[^]]*\]\]' "$content" 2>/dev/null || true)
+$(strip_code "$content" | grep -oE '\[\[[^]]*\]\]' 2>/dev/null || true)
 EOF
 }
 
@@ -408,13 +429,13 @@ fi
 # matched against the record's own **Area:**/**Nature:** field, not a raw substring
 # search over the whole file (decision:072 step 4: a Nature mismatch was never checked
 # at all, and the Area check could match unrelated prose).
-iter_area="$(field "$iter_content" Area)"
-iter_nature="$(field "$iter_content" Nature)"
+iter_area="$(field_list "$iter_content" Area)"
+iter_nature="$(field_list "$iter_content" Nature)"
 for v in $(printf '%s' "$AREA" | tr ',' ' '); do
-  case ",$iter_area," in *",$v,"*) : ;; *) fail "Area '$v' in commit but not in iteration $iter_file (Area: $iter_area)";; esac
+  case " $iter_area " in *" $v "*) : ;; *) fail "Area '$v' in commit but not in iteration $iter_file (Area: $iter_area)";; esac
 done
 for v in $(printf '%s' "$NATURE" | tr ',' ' '); do
-  case ",$iter_nature," in *",$v,"*) : ;; *) fail "Nature '$v' in commit but not in iteration $iter_file (Nature: $iter_nature)";; esac
+  case " $iter_nature " in *" $v "*) : ;; *) fail "Nature '$v' in commit but not in iteration $iter_file (Nature: $iter_nature)";; esac
 done
 
 ok "Iteration commit valid (iter $ITERATION, Area: $AREA, Nature: $NATURE)"
