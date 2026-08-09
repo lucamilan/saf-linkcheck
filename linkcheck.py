@@ -6,12 +6,20 @@ Percorre i file .md della cartella, estrae i link e verifica che i
 bersagli interni (percorsi relativi) esistano. Di default i link
 esterni (http, https, mailto) restano fuori perimetro; con --esterni
 i link http e https vengono verificati in rete con una richiesta
-HEAD. Esce con 1 se trova almeno un link rotto, con 0 altrimenti.
+HEAD. Gli esiti esterni vengono conservati per un giorno in
+.linkcheck-cache.json dentro la cartella controllata (file da
+ignorare in Git). Esce con 1 se trova almeno un link rotto, con 0
+altrimenti.
 """
 
+import json
 import re
 import sys
+import time
 from pathlib import Path
+
+CACHE_NAME = ".linkcheck-cache.json"
+CACHE_TTL = 24 * 60 * 60
 
 LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)\)")
 EXTERNAL_PREFIXES = ("http://", "https://", "mailto:")
@@ -37,12 +45,38 @@ def check_external(url, timeout=5):
         return False
 
 
-def check_file(md_file, root, esterni=False):
+def load_cache(root):
+    path = root / CACHE_NAME
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def save_cache(root, cache):
+    (root / CACHE_NAME).write_text(
+        json.dumps(cache, indent=2), encoding="utf-8"
+    )
+
+
+def check_external_cached(url, cache):
+    entry = cache.get(url)
+    if entry is not None and time.time() - entry["ts"] < CACHE_TTL:
+        print(f"linkcheck: dalla cache: {url}")
+        return entry["ok"]
+    ok = check_external(url)
+    cache[url] = {"ok": ok, "ts": time.time()}
+    return ok
+
+
+def check_file(md_file, root, esterni=False, cache=None):
     broken = []
     text = md_file.read_text(encoding="utf-8")
     for lineno, target in iter_links(text):
         if target.startswith(("http://", "https://")):
-            if esterni and not check_external(target):
+            if esterni and not check_external_cached(target, cache):
                 broken.append((md_file.relative_to(root), lineno, target))
             continue
         if target.startswith(EXTERNAL_PREFIXES) or target.startswith("#"):
@@ -66,9 +100,12 @@ def main(argv):
     if not root.is_dir():
         print(f"linkcheck: cartella non trovata: {root}", file=sys.stderr)
         return 2
+    cache = load_cache(root) if esterni else None
     broken = []
     for md_file in sorted(root.rglob("*.md")):
-        broken.extend(check_file(md_file, root, esterni=esterni))
+        broken.extend(check_file(md_file, root, esterni=esterni, cache=cache))
+    if esterni:
+        save_cache(root, cache)
     for rel, lineno, target in broken:
         print(f"{rel}:{lineno}: link rotto -> {target}")
     print(f"linkcheck: link rotti: {len(broken)}")
