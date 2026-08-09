@@ -42,14 +42,18 @@
 
 ## Project
 
-Senior profile: `<name, priorities — e.g. resilience, robustness, observability>`.
+**linkcheck** — strumento a riga di comando che valida i link di un manoscritto
+Markdown: link interni fra file, ancore, immagini. Nasce per il manoscritto di
+«Il Senior amplificato»; deve restare piccolo, deterministico e usabile in CI.
+
+Senior profile: `Luca — semplicità, determinismo, poche dipendenze giustificate`.
 
 **`Area`** enum (where in the system — project-specific, extensible on proposal):
 
-- `<area-1>` — `<what it covers>`
-- `<area-2>` — `<what it covers>`
+- `scanner` — lettura dei file Markdown, estrazione e classificazione dei link
+- `report` — esiti del controllo: formato di uscita, exit code, integrazione CI
 
-<!-- AREA_ENUM: <area-1> <area-2> -->
+<!-- AREA_ENUM: scanner report -->
 
 **`Nature`** enum (universal): `new-feature · bug · refactor · resilience ·
 performance · security · docs · analysis`.
