@@ -84,8 +84,8 @@ Tutto si legge come Markdown, senza strumenti.
 - **`.githooks/`** — gli hook di Git che rifiutano un commit fuori contratto. Durante il
   laboratorio hanno colpito due volte, e nessuna delle due era in programma.
 - **`.claude/skills/`** — le skill `saf` e `saf-ops`.
-- **La storia Git** — sedici commit; dal secondo in poi ognuno porta esattamente un trailer di
-  specie (`Chore:`, `Iteration:`, `Roadmap:`, `Source:`). Il grafo ne deriva le relazioni senza
+- **La storia Git** — dal secondo commit in poi, ognuno porta esattamente un trailer di specie
+  (`Chore:`, `Iteration:`, `Roadmap:`, `Source:`). Il grafo ne deriva le relazioni senza
   che nessuno le abbia scritte a mano, quindi `git log` si legge come un indice:
 
 ```bash
