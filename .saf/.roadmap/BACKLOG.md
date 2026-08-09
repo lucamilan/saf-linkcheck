@@ -5,3 +5,11 @@
 > deferral. A commit touching only this file: trailer `Roadmap: BL-NNN`.
 
 <!-- Format: ### BL-NNN · title / Status: open | promoted | dropped / Note -->
+
+### BL-001 · Verifica delle ancore interne (#sezione) nei link fra file
+- **Status:** open
+- **Nota:** Limite dichiarato della v1: il bersaglio viene verificato come file, non come sezione. Un link a un titolo rinominato passa il controllo e arriva rotto al lettore.
+
+### BL-002 · Cache degli esiti dei controlli esterni
+- **Status:** open
+- **Nota:** La lezione della iterazione 002: HEAD con timeout e' un oracolo imperfetto e la rete rende l'esito volatile. Una cache con scadenza renderebbe il controllo esterno ripetibile e piu' gentile verso i siti.
