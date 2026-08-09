@@ -105,3 +105,15 @@ documentato. Del metodo il libro dà la trattazione; questo repository ne mostra
 Un rilievo autentico è rimasto agli atti: la `decision:004` scrive che la cache vive «accanto»
 alla cartella controllata, mentre l'attuazione la mette «dentro». La discrepanza è emersa dal
 controllo incrociato dell'atto 10 e non è stata sanata in silenzio.
+
+## Licenza
+
+Tre materiali, tre condizioni; il dettaglio sta in [`LICENSE`](LICENSE).
+
+- **Il codice dimostrativo** — `linkcheck.py` e le fixture — è sotto licenza MIT: prendilo,
+  se ti serve.
+- **Il kit SAF** — `saf-prompt.md`, `CLAUDE.md`, gli hook, le skill — è pubblicato in sola
+  lettura, con tutti i diritti riservati. Serve a rendere leggibile il laboratorio, non a
+  essere ridistribuito. Per usarlo in un tuo progetto, scrivimi.
+- **La cognizione del laboratorio** — i record di `.saf/`, i messaggi di commit, questo
+  README — segue le condizioni del libro: CC BY-NC-ND 4.0.

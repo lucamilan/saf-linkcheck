@@ -1,0 +1,94 @@
+# Licenza
+
+Copyright (c) 2026 Luca Milan.
+
+Questo repository contiene tre materiali di natura diversa, e ciascuno ha le proprie
+condizioni. In caso di dubbio su un file non elencato, valgono le condizioni della sezione 2
+(la più restrittiva).
+
+---
+
+## 1. Il codice dimostrativo — licenza MIT
+
+Si applica a:
+
+- `linkcheck.py`
+- `fixture/`, `fixture-sana/`, `fixture-esterni/`
+- `.gitignore`
+
+```
+MIT License
+
+Copyright (c) 2026 Luca Milan
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+---
+
+## 2. Il kit SAF — tutti i diritti riservati, pubblicato in sola lettura
+
+Si applica a:
+
+- `saf-prompt.md`, `CLAUDE.md`, `claude-snippet.md`
+- `install-hooks.sh`
+- `.githooks/`
+- `.claude/` (impostazioni e skill `saf`, `saf-ops`)
+- `.saf/.kit/` e i file `README.md` interni a `.saf/` (impalcatura del kit)
+
+Sono il metodo SAF nella forma vincolante in cui viene installato in un progetto. Vengono
+pubblicati qui **perché il laboratorio sia leggibile e verificabile**: senza il prompt e gli
+hook, i record e i commit di questo repository non si spiegano.
+
+Restano coperti da copyright, con tutti i diritti riservati. È concesso leggerli, citarne
+estratti brevi con attribuzione e riprodurli per commento, recensione, studio o cronaca.
+Non è concesso ridistribuirli, in tutto o in parte sostanziale, né pubblicarne opere
+derivate, né incorporarli in un prodotto o in un servizio, senza autorizzazione scritta
+dell'autore.
+
+Per l'uso in un tuo progetto, scrivi all'autore.
+
+---
+
+## 3. La cognizione del laboratorio — CC BY-NC-ND 4.0
+
+Si applica a:
+
+- i record in `.saf/.decisions/`, `.saf/.iterations/`, `.saf/.knowledge/`, `.saf/.sources/`
+  e `.saf/.roadmap/`, esclusi i `README.md` di impalcatura coperti dalla sezione 2
+- i messaggi di commit
+- `README.md`
+
+Sono materiale a corredo del libro «Il Senior amplificato» e ne condividono le condizioni:
+[Creative Commons Attribuzione — Non commerciale — Non opere derivate 4.0 Internazionale](https://creativecommons.org/licenses/by-nc-nd/4.0/deed.it).
+
+In breve: puoi copiarli e ridistribuirli in qualunque formato, citando l'autore e il libro;
+non puoi usarli per scopi commerciali; non puoi distribuire il materiale modificato. La
+citazione di estratti per commento, recensione, studio o cronaca resta comunque libera.
+
+---
+
+## Marchi e opere di terzi
+
+`.saf/.sources/001_cool-uris.md` registra la provenienza di un documento del W3C
+(*Cool URIs don't change*, Tim Berners-Lee, 1998), che resta soggetto alle proprie
+condizioni: qui ne è archiviato il riferimento, non il testo.
+
+Claude e Claude Code sono marchi di Anthropic. Il repository non è affiliato ad Anthropic
+né da essa approvato.
