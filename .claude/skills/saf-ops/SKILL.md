@@ -42,6 +42,16 @@ Read-only operational snapshot. Lead with `healthy`, `degraded` or `attention`, 
    both. A non-empty `anomalies` list is itself the `attention` trigger for this axis —
    read it, don't re-derive the thresholds. Pass `--by-kit-version` when comparing the
    method's behavior across a kit upgrade.
+5. what the ceremony costs, when that is the question asked: `stats --by-lane` answers it in
+   one call — spend per bracket by lane and how much of it is the read bootstrap — with
+   `--brackets` (cost joined to outcome, per iteration) and `--turns` (where the context
+   grows, turn by turn) for the detail behind it. Each of the three prints that view and
+   nothing else. Two figures are labelled and must stay labelled when reported: `active`
+   (input+output+cache_creation, what a bracket spends) is not `drag` (cache_read, a context
+   already paid for and re-read every turn), and the bootstrap `proxy` share is an estimate
+   from `out_chars`, never a measure. A lane with no bracket yet makes the comparison
+   unanswerable, which the answer line says outright — do not fill the gap with the lanes
+   that do have data.
 Report remedies (`stats`'s own anomaly lines already read as recommended actions) but do
 not execute them.
 

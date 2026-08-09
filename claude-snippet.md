@@ -51,7 +51,9 @@
 > a local, gitignored JSONL (`.saf/.cache/telemetry.jsonl`) of sessions and tokens spent —
 > never leaves the machine and **OFF by default**: the hooks ship, the switch does not.
 > Opt in per project with an `env` block (`"SAF_TELEMETRY": "1"`) in your
-> `.claude/settings.local.json`; read the summary with **`saf-tools stats`**. Prerequisites: **git** installed, repo is a **git repository**, the
+> `.claude/settings.local.json`; read the summary with **`saf-tools stats`** (and
+> **`stats --by-lane`** for what the method's ceremony costs per lane, bootstrap share
+> included). Prerequisites: **git** installed, repo is a **git repository**, the
 > **`saf-tools`** binary on `PATH` (no python needed — it's a single compiled binary). No engine →
 > read `.saf/` directly (graceful degradation). Name your project's concrete engine under `## Project`.
 >
