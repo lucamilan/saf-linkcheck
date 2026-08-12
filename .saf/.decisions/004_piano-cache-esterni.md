@@ -14,3 +14,6 @@ Il controllo dei link esterni resta opzionale ma diventa ripetibile: gli esiti v
 ## Relations
 - informed-by → [[knowledge:001]]
 - delivered-by → [[iteration:003]]
+
+## Amendments (append-only)
+- 2026-08-12 · [docs] · Correzione disposta dal Senior sulla sede della cache. Il corpo di questa decisione scrive «accanto alla cartella controllata»; il piano, la disposizione registrata alla ripresa dal parcheggio e l'attuazione la mettono dentro la cartella controllata, come .linkcheck-cache.json. Vale l'attuazione: la cache sta dentro. Il corpo resta come fu scritto, perche' la storia dell'imprecisione e' essa stessa traccia.
