@@ -84,6 +84,13 @@ Tutto si legge come Markdown, senza strumenti.
 - **`.githooks/`** — gli hook di Git che rifiutano un commit fuori contratto. Durante il
   laboratorio hanno colpito due volte, e nessuna delle due era in programma.
 - **`.claude/skills/`** — le skill `saf` e `saf-ops`.
+- **Quello che non c'è: gli strumenti.** I record di `.saf/` sono composti da `saf-tools`, la
+  facade a riga di comando dell'harness, e quel binario non sta in questo repository. Qui c'è
+  la parte normativa e meccanica del metodo — il prompt vincolante, gli hook, le skill — con
+  il residuo che ha prodotto; non c'è il codice che lo produce. È la forma della
+  distribuzione, non una mancanza: a un progetto che installa SAF arriva un eseguibile, non i
+  moduli che lo compongono. Per leggere il laboratorio il binario non serve, perché tutto è
+  Markdown; serve a chi volesse rigiocarlo.
 - **La storia Git** — dal secondo commit in poi, ognuno porta esattamente un trailer di specie
   (`Chore:`, `Iteration:`, `Roadmap:`, `Source:`). Il grafo ne deriva le relazioni senza
   che nessuno le abbia scritte a mano, quindi `git log` si legge come un indice:
