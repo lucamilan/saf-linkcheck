@@ -40,6 +40,21 @@
 > `.mimir` marker for a stable cross-machine id. Without a backend, `recall` falls back to keyword,
 > the code verbs report unavailable, and the hook is a safe no-op (graceful). `SAF_NO_BACKEND=1` forces it off.
 
+## Language
+
+Write every file under `.saf/` in English — bodies, titles, lessons, backlog entries, and the
+slug after the `NNN_` prefix — whatever language this session speaks. Ask `recall` in English
+too: an English corpus questioned in another language is the worst case measured, worse than the
+corpus was before it was English at all.
+
+Leave exactly as they are spelled: the `NNN_` numeric prefix, which resolves the node; the
+machine tokens of the loop-plan form, matched by regex from the kit's `contract.toml`; and real
+identifiers quoted in prose — flags, file names, literal output. Cognition that renames the tool
+describes a tool that does not exist.
+
+The why, the scope and the accepted limits are in [[decision:006]] — that record is the
+authority, this is the operating rule.
+
 ## Project
 
 **linkcheck** — a command-line tool that validates the links of a Markdown
