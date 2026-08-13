@@ -28,6 +28,8 @@ If `.saf/` is missing or incomplete, ask the senior to run `saf-tools init`. Oth
 
 The same discipline binds questions about the **current code**, which is indexed and graphed alongside the cognition: `recall --scope code` locates it, and the code-graph verbs — `code callers|calls|impact|path|hubs` — answer the relations between symbols: who calls this, what a change reaches. Their answer is derived from the graph, so an empty one is a result, not a failed search. Text search over files (grep, glob) is an anchor once the engine has answered, never the opening move. Declare the outcome here too, before concluding that something exists, is unused, or is safe to change.
 
+Both are queried in the language of the records, never the language of the session: the index embeds with English-only models (§6), so a question asked in another language than the corpus reaches its lexical channel alone — measured below what the same corpus scored before it was English at all. Translate the question before firing `recall`, and keep identifiers, file names and quoted output verbatim: they are the anchors that survive the crossing.
+
 Use file or keyword fallback only when the semantic engine is unavailable, and say that retrieval is degraded.
 
 ## 4. Iteration lifecycle
@@ -72,7 +74,7 @@ Every work commit carries the iteration trailer and approved classification. Bac
 ## 5. Autonomous loop
 Autonomy starts only when the senior explicitly requests and approves a loop plan.
 
-A complex analysis delivers an immutable plan-decision — a `## Piano (loop)` section containing goal, budget, admitted escalation triggers and numbered steps with machine-checkable oracles (`describe --type plan` for the exact form). Execution uses one `fast` iteration: one step per commit, telemetry in the execution record, and the plan referenced through `Decisions:`.
+A complex analysis delivers an immutable plan-decision — a `## Plan (loop)` section containing goal, budget, admitted escalation triggers and numbered steps with machine-checkable oracles (`describe --type plan` for the exact form). Execution uses one `fast` iteration: one step per commit, telemetry in the execution record, and the plan referenced through `Decisions:`.
 
 On repeated oracle failure, exhausted budget, invariant change, directional choice or plan deviation: park and stop (`describe --type trigger` for the exact tokens). The senior then resumes, amends or supersedes the plan, or abandons the work. Never mutate the approved plan merely to track progress.
 
@@ -80,6 +82,8 @@ On repeated oracle failure, exhausted budget, invariant change, directional choi
 Use only typed IDs. Author each relation once, in a `## Relations` block, on its natural side; inverse, application and commit relations are derived. Iterations do not author relation blocks.
 
 External material is registered as a source with provenance, then distilled into knowledge or a decision. Do not silently consume raw input or duplicate an existing provenance.
+
+Records are written in English, whatever language the session speaks — and so are the queries that look for them (§3). This is retrieval, not style: the semantic index behind `recall` embeds with English-only models, so a record in another language is reachable by its exact words and by nothing else. Identifiers, machine tokens and quoted literal output keep their real spelling — cognition that renames the tool describes a tool that does not exist.
 
 ## 7. Quality floor
 Prefer simple, modular, observable and resilient solutions. Avoid unnecessary dependencies and magic values. State what was validated and what remains uncertain. Records are pragmatic, not exhaustive: capture the decision, its why and what changed in the fewest words a fresh session needs — verbosity is not rigor.

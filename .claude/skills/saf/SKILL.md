@@ -12,6 +12,7 @@ Routine lifecycle queries use `describe --type <T> --compact` (location, id verb
 - Missing/incomplete kit: ask the senior to run `saf-tools init`.
 - Otherwise: the SessionStart hook already ran `refresh` and `present` — read that output rather than re-running them (only run them yourself if no hook fired, e.g. a mid-session invocation). Resume the active iteration before opening another.
 - **Read-through** for prior choices or lessons: `recall` (hits arrive **graph-expanded**) → `get` (content + **currency footer**, already enough for a currency check) → `neighbors` only when the full relation graph beyond currency is needed. A node found is not the answer until its currency is seen. **Declare the outcome** — the pertinent typed IDs, or "nothing pertinent" — before concluding.
+- **The query is in the records' language, not the session's** (§3): translate the question into English before firing `recall`, identifiers and quoted output verbatim. Asking in the session's language when the corpus is English is the worst of the four cases, not a neutral one.
 
 ## Open (§4.1)
 1. Query history and classify the request as new surface, follow-up, or documentation-only correction.
@@ -34,7 +35,7 @@ is refused while an iteration is in progress.
 - For analysis, produce alternatives, rationale and a disposition.
 
 ## Autonomous loop (§5)
-Only after the senior approves a plan-decision (`## Piano (loop)`, form via `describe --type plan`). Execute one step per commit, write progress to execution telemetry, and cite the plan in `Decisions:`. On any admitted trigger (`describe --type trigger` for the tokens) or plan deviation: `park` and stop; resume only after senior disposition.
+Only after the senior approves a plan-decision (`## Plan (loop)`, form via `describe --type plan`). Execute one step per commit, write progress to execution telemetry, and cite the plan in `Decisions:`. On any admitted trigger (`describe --type trigger` for the tokens) or plan deviation: `park` and stop; resume only after senior disposition.
 
 ## Close and commit (§4.3)
 1. Validate the complete bracket.

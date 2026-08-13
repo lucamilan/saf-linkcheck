@@ -36,12 +36,14 @@
 > **Read-through (§3).** When the project ships the SAF **query engine**, the agent **queries it
 > instead of reading raw `.saf/`** (`saf-tools present` stays direct; files are write-target +
 > fallback). The facade is the **`saf-tools`** binary, **CLI only** — one verb per capability, no
-> resident server (the MCP transport was retired):
+> resident server (the MCP transport was retired). The inventory is **not copied here** — a
+> list pasted into your `CLAUDE.md` is a snapshot that ages at the next kit upgrade, while
+> the facade answers for itself:
 >
 > ```
-> saf-tools present · recall · search · get · neighbors · history · next-id
->           record · close · amend · supersede · commit · backlog · describe
->           refresh · status · outline · peek · code · audit · conscience · telemetry · stats
+> saf-tools --help                # the live verb list
+> saf-tools <verb> --help         # that verb's arguments
+> saf-tools describe --type <T>   # the record contract: fields, enums, closing gate
 > ```
 >
 > The kit's `.claude/settings.json` (copied to the repo root) ships the Claude wiring: the

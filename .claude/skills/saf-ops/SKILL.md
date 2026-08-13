@@ -13,7 +13,8 @@ Invoke as `/saf-ops <retrieve|health|sal|conscience|groom>`. Prefer facade comma
 Refresh when needed, then choose the cheapest query:
 - meaning: `recall`; active work: `present`; in-force decisions: `memory`;
 - exact text: `search`; node/edges: `get` / `neighbors`;
-- structure: `chains`, `applies`, `relations`, `nodes`, `orphans`, `pending`, `path`;
+- structure: `chains`, `applies`, `relations`, `nodes`, `orphans`, `pending`;
+- provenance between two nodes, or around one: `path`;
 - history/code: `history`, `outline`, `peek`, `code`.
 Judge pertinence; do not infer relevance from hit count.
 
@@ -21,6 +22,12 @@ Judge pertinence; do not infer relevance from hit count.
 When a question might be settled by current code rather than by prior decisions (e.g. "does
 X already work like Y", "is this implemented"), pass `--scope code` or `--scope all`
 explicitly, or run a separate code search — a cognition-only miss is not "nothing pertinent".
+
+`path` answers provenance, not connectivity: it walks chains that keep a single currency
+direction, so `no provenance chain` is an **answer** — the two nodes are unrelated *in that
+sense*. Two nodes under a common parent are connected without either descending from the
+other, and that shape is not walked. Neighborhood mode is bounded twice, in hops and in
+size, and says what it left out.
 
 For relations between symbols, `code callers|calls|impact|path|hubs` beats any text search: they
 resolve over the call graph, so `no callers found` is an **answer** (nothing calls it), not a
@@ -85,4 +92,5 @@ The only persistent-writing mode. Scope: backlog hygiene.
 5. Commit using the machine-defined backlog contract (`Roadmap:` trailer); never mix external
    reports into that commit.
 
-`groom list` is read-only. Process lifecycle and ordinary commits belong to `/saf`, not this skill.
+Listing under this mode is read-only — `groom` is a mode of this skill, not a `saf-tools` verb.
+Process lifecycle and ordinary commits belong to `/saf`, not this skill.
