@@ -6,6 +6,6 @@
 
 <!-- Format: ### BL-NNN · title / Status: open | promoted | dropped / Note -->
 
-### BL-003 · Verifica dei frammenti #sezione nello stesso file
+### BL-003 · Verification of #section fragments within the same file
 - **Status:** open
-- **Nota:** Limite accettato in [[decision:005]] e non ancora tracciato: i frammenti #sezione senza percorso restano fuori perimetro, ma un manoscritto li usa negli indici interni dei capitoli. L'algoritmo delle ancore esiste gia' ([[iteration:005]]): applicarlo al file corrente chiude il buco con lo stesso oracolo a fixture, senza nuove dipendenze.
+- **Note:** Limit accepted in [[decision:005]] and not yet tracked: #section fragments without a path stay out of scope, but a manuscript uses them in the internal indexes of the chapters. The anchor algorithm already exists ([[iteration:005]]): applying it to the current file closes the gap with the same fixture oracle, without new dependencies.

@@ -42,18 +42,19 @@
 
 ## Project
 
-**linkcheck** — strumento a riga di comando che valida i link di un manoscritto
-Markdown: link interni fra file, ancore, immagini. Nasce per il manoscritto di
-«Il Senior amplificato»; deve restare piccolo, deterministico e usabile in CI.
+**linkcheck** — a command-line tool that validates the links of a Markdown
+manuscript: internal links between files, anchors, images. Born for the manuscript
+of «Il Senior amplificato»; it must stay small, deterministic and usable in CI.
 
-Senior profile: `Luca — semplicità, determinismo, poche dipendenze giustificate`.
+Senior profile: `Luca — simplicity, determinism, few justified dependencies`.
 
 **`Area`** enum (where in the system — project-specific, extensible on proposal):
 
-- `scanner` — lettura dei file Markdown, estrazione e classificazione dei link
-- `report` — esiti del controllo: formato di uscita, exit code, integrazione CI
+- `scanner` — reading the Markdown files, extracting and classifying the links
+- `report` — the outcome of the check: output format, exit code, CI integration
+- `cognition` — the `.saf/` records themselves: form, language, indexing and retrieval
 
-<!-- AREA_ENUM: scanner report -->
+<!-- AREA_ENUM: scanner report cognition -->
 
 **`Nature`** enum (universal): `new-feature · bug · refactor · resilience ·
 performance · security · docs · analysis`.

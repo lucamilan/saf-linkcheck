@@ -1,10 +1,10 @@
-# 001 · linkcheck v1: controllo dei link interni del manoscritto
+# 001 · linkcheck v1: checking the internal links of the manuscript
 
 - **Status:** closed
 - **Lane:** fast
 - **Area:** scanner, report
 - **Nature:** new-feature
 - **Date:** 2026-08-09
-- **Lesson:** Una esclusione di perimetro va validata, non solo dichiarata: la fixture sana contiene apposta un link esterno, cosi' l'oracolo dimostra che l'esclusione funziona invece di darla per buona.
+- **Lesson:** A scope exclusion has to be validated, not merely declared: the healthy fixture deliberately contains an external link, so the oracle proves the exclusion works instead of taking it for granted.
 
-Scopo: primo strumento funzionante che percorre i file Markdown di una cartella, estrae i link e segnala quelli interni rotti (file di destinazione mancante). Perimetro v1: link relativi fra file; esclusi i link esterni HTTP. Oracolo di validazione: eseguito su una fixture con un link rotto noto, lo strumento lo elenca ed esce con codice 1; su una fixture sana esce con codice 0.
+Purpose: first working tool that walks the Markdown files of a folder, extracts the links and reports the broken internal ones (missing target file). v1 scope: relative links between files; external HTTP links excluded. Validation oracle: run on a fixture with a known broken link, the tool lists it and exits with code 1; on a healthy fixture it exits with code 0.
