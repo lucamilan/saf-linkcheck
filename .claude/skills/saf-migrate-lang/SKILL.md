@@ -54,6 +54,16 @@ corpus born in English is not the same thing as a translated one.
 
 Decisions and knowledge alone take most of the gain. On a tight budget, stop there.
 
+**The partial pass on closed iterations** — their titles and `Lesson:` lines only, everything
+else left alone — is a deliberate exception the senior may dispose, and it is worth less than the
+figures above. Measured on a corpus of roughly 2000 indexed files: of four probes phrased as
+paraphrases of closed brackets, two moved (one from absent to rank 2, one to first on its own
+lesson) and two did not. The reason is structural and predictable — the `Lesson:` is one chunk
+while every other chunk of the same record stays in the source language, so the record goes from
+unreachable to reachable, not to reliably first. If you later weigh translating those bodies too,
+weigh them against this number and not against the full-migration figures. Such a pass needs
+`--allow-holds` on both `rename` and `verify`.
+
 Outside `.saf/` nothing is touched: the host `CLAUDE.md`, the language the session speaks, and
 editorial or user-facing content are not the method's business and never were.
 
@@ -114,6 +124,15 @@ machine tokens exactly as they are spelled.
 python .claude/skills/saf-migrate-lang/migrate_lang.py rename
 python .claude/skills/saf-migrate-lang/migrate_lang.py rename --apply
 ```
+
+Held types are skipped: their titles were not supposed to change. If they did change, deliberately
+and under `--allow-holds`, pass the same flag here so the address follows the title — a filename in
+the old language over an English title is the one state nobody disposed.
+
+The flag authorizes the held records **this pass edited**, compared against the snapshot — never
+the whole type. A closed record the translation never opened keeps its filename however far that
+name has drifted from the current slug convention: re-addressing history nobody touched is what
+the hold policy is for. The count of those is printed, so a narrowing is never silent.
 
 **5 · verify.**
 

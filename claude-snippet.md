@@ -1,21 +1,58 @@
 # Snippet for the host project's CLAUDE.md
 
-> **Install = two steps:** put the **`saf-tools`** binary in a global location on your
-> `PATH` (no python needed), then run **`saf-tools init`** in the project root (a git
-> repo). It materializes the whole kit — this prompt, the `.saf/` cognition seed, the
-> hooks, the `saf*` skills, `.claude/settings.json` — wires `core.hooksPath`, and creates
-> `CLAUDE.md` from the block below if the project has none (otherwise: paste the block
-> yourself). The agent **scaffolds nothing**; on first run it reads the installed `.saf/`
-> and asks you to fill the `<...>` parts.
->
-> The seed includes the kit **sentinel** `.saf/.kit/VERSION` (stamped with the installed
-> kit version), which **arms** the consumer freeze: the `pre-commit` refuses hand-edits to
-> the vendored machinery (this prompt, `.githooks/`, `.claude/skills/saf*`,
-> `.claude/settings.json`) — the method changes only by re-deploying a newer kit:
-> **`saf-tools init --force`** (never touches your `.saf/`). Measure drift with
-> **`saf-tools init --check`** — it also runs by itself at every session start (a
-> `SessionStart` hook in the shipped settings, warn-only: it reports, never blocks).
-> Intentional override is explicit and tracked (`git commit --no-verify`).
+> **This file is shipped documentation, not agent context.** Only the block between the
+> paste markers below travels into the host `CLAUDE.md` and gets loaded at every session.
+> Everything else here is read once, by you, when you install or troubleshoot the kit —
+> that split is the point (progressive disclosure: what is needed occasionally is
+> reachable, not resident).
+
+## Install
+
+**Two steps:** put the **`saf-tools`** binary in a global location on your `PATH` (no
+python needed), then run **`saf-tools init`** in the project root (a git repo). It
+materializes the whole kit — the prompt, the `.saf/` cognition seed, the hooks, the `saf*`
+skills, `.claude/settings.json` — wires `core.hooksPath`, and creates `CLAUDE.md` from the
+paste block if the project has none (otherwise: paste the block yourself). The agent
+**scaffolds nothing**; on first run it reads the installed `.saf/` and asks you to fill the
+`<...>` parts.
+
+Prerequisites: **git** installed, the repo is a **git repository**, the **`saf-tools`**
+binary on `PATH`. No engine → the agent reads `.saf/` directly (graceful degradation).
+
+## Upgrade and freeze
+
+The seed includes the kit **sentinel** `.saf/.kit/VERSION` (stamped with the installed kit
+version), which **arms** the consumer freeze: the `pre-commit` refuses hand-edits to the
+vendored machinery (the prompt, `.githooks/`, `.claude/skills/saf*`,
+`.claude/settings.json`) — the method changes only by re-deploying a newer kit:
+**`saf-tools init --force`** (never touches your `.saf/`). Measure drift with
+**`saf-tools init --check`** — it also runs by itself at every session start (a
+`SessionStart` hook in the shipped settings, warn-only: it reports, never blocks).
+Intentional override is explicit and tracked (`git commit --no-verify`).
+
+## What `.claude/settings.json` wires
+
+Copied to the repo root, it ships the Claude wiring: the `Bash(saf-tools:*)` allowlist
+(zero permission prompts), `SessionStart` hooks running **`saf-tools refresh`** and the
+kit drift check (**`saf-tools init --check --warn`**), and session telemetry.
+
+Telemetry (**`saf-tools telemetry`** on `SessionStart`/`Stop`/`SessionEnd`) writes a local,
+gitignored JSONL (`.saf/.cache/telemetry.jsonl`) of sessions and tokens spent — it never
+leaves the machine and is **OFF by default**: the hooks ship, the switch does not. Opt in
+per project with an `env` block (`"SAF_TELEMETRY": "1"`) in your
+`.claude/settings.local.json`; read the summary with **`saf-tools stats`** (and
+**`stats --by-lane`** for what the method's ceremony costs per lane, bootstrap share
+included).
+
+## Optional semantic/code backend
+
+`saf-tools recall` (by meaning) and the code verbs are powered by a swappable local index
+backend behind the facade. Just make the backend resolvable: **put it on `PATH`** (the
+normal case) or, as a fallback, set **`SAF_MIMIR_BIN`** to its binary in your **local**
+settings (`.claude/settings.local.json` — never committed; that's where machine-specific
+paths belong). Run `mimir project init` once and commit the `.mimir` marker for a stable
+cross-machine id. Without a backend, `recall` falls back to keyword, the code verbs report
+unavailable, and the hook is a safe no-op (graceful). `SAF_NO_BACKEND=1` forces it off.
 
 ---
 
@@ -25,20 +62,9 @@
 
 @saf-prompt.md
 
-> The method above is **binding**. The project's live state lives in `.saf/`.
-> To enable formal commit validation: `bash install-hooks.sh`
-> (or `git config core.hooksPath .githooks`).
->
-> The kit includes the **`saf*` skill family** (`.claude/skills/`): `saf` (process guardrail —
-> the third pillar; invoke at open/close of each iteration) and `saf-ops` (operations bench,
-> five modes: `/saf-ops retrieve|health|sal|conscience|groom`). Copy `.claude/skills/` with the kit.
->
-> **Read-through (§3).** When the project ships the SAF **query engine**, the agent **queries it
-> instead of reading raw `.saf/`** (`saf-tools present` stays direct; files are write-target +
-> fallback). The facade is the **`saf-tools`** binary, **CLI only** — one verb per capability, no
-> resident server (the MCP transport was retired). The inventory is **not copied here** — a
-> list pasted into your `CLAUDE.md` is a snapshot that ages at the next kit upgrade, while
-> the facade answers for itself:
+> The method above is **binding**; the project's live state lives in `.saf/`. The engine is
+> the **`saf-tools`** binary — the read-through facade of §3, and the only writer of `.saf/`.
+> It answers for itself, so nothing about it is copied here:
 >
 > ```
 > saf-tools --help                # the live verb list
@@ -46,26 +72,10 @@
 > saf-tools describe --type <T>   # the record contract: fields, enums, closing gate
 > ```
 >
-> The kit's `.claude/settings.json` (copied to the repo root) ships the Claude wiring: the
-> `Bash(saf-tools:*)` allowlist (zero permission prompts), `SessionStart` hooks running
-> **`saf-tools refresh`** and the kit drift check (**`saf-tools init --check --warn`**),
-> and session telemetry (**`saf-tools telemetry`** on `SessionStart`/`Stop`/`SessionEnd`):
-> a local, gitignored JSONL (`.saf/.cache/telemetry.jsonl`) of sessions and tokens spent —
-> never leaves the machine and **OFF by default**: the hooks ship, the switch does not.
-> Opt in per project with an `env` block (`"SAF_TELEMETRY": "1"`) in your
-> `.claude/settings.local.json`; read the summary with **`saf-tools stats`** (and
-> **`stats --by-lane`** for what the method's ceremony costs per lane, bootstrap share
-> included). Prerequisites: **git** installed, repo is a **git repository**, the
-> **`saf-tools`** binary on `PATH` (no python needed — it's a single compiled binary). No engine →
-> read `.saf/` directly (graceful degradation). Name your project's concrete engine under `## Project`.
->
-> **Optional semantic/code backend.** `saf-tools recall` (by meaning) and the code verbs
-> (`outline`/`peek`/`code`) are powered by a swappable local index backend behind the facade.
-> Just make the backend resolvable: **put it on `PATH`** (the normal case) or, as a fallback, set
-> **`SAF_MIMIR_BIN`** to its binary in your **local** settings (`.claude/settings.local.json` — never
-> committed; that's where machine-specific paths belong). Run `mimir project init` once and commit the
-> `.mimir` marker for a stable cross-machine id. Without a backend, `recall` falls back to keyword,
-> the code verbs report unavailable, and the hook is a safe no-op (graceful). `SAF_NO_BACKEND=1` forces it off.
+> The kit also installs the **`saf*` skill family** (`.claude/skills/`): `saf` (process
+> guardrail — invoke at open and close of each bracket) and `saf-ops` (operations bench).
+> Install, upgrade, hooks, telemetry and semantic backend are documented in the shipped
+> `claude-snippet.md`, and read from there when they are the question.
 
 ## Project
 
@@ -81,9 +91,8 @@ Senior profile: `<name, priorities — e.g. resilience, robustness, observabilit
 **`Nature`** enum (universal): `new-feature · bug · refactor · resilience ·
 performance · security · docs · analysis`.
 
-**Default lane** — which lane the agent's proposal starts from when you don't classify the
-work yourself (§4.1). Ships as `fast`: SAF stays the rule, and exempting a project is an
-explicit local choice.
+**Default lane** (§4.1) — the lane the agent's proposal starts from when you don't classify
+the work yourself. Ships as `fast`; the marker below is what you edit.
 
 <!-- SAF_DEFAULT_LANE: fast -->
 

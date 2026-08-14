@@ -68,13 +68,11 @@ Build `done / doing / will-do candidates` from recent closed work, `present` and
 ## conscience
 Run the coherence critique and separate soft findings from hard audit failures. Findings are proposals for senior disposition, never blockers by themselves. Requested reports live outside `.saf/`.
 
-**Fixing what these two modes surface.** A finding from `conscience` or `groom` that resolves
-into a safe mechanical patch is committed under the **chore** kind — no iteration, no lane to
-weigh: apply it and move on. Ceremony returns only when the fix carries a choice or a lesson,
-which escalates it to an iteration before the commit. Two contract limits shape where it lands,
-and neither is a reason to open a bracket: a chore never touches `.saf/` (hygiene inside it
-commits under its own kind, `Roadmap:` for the backlog), and a chore is refused while an
-iteration is in progress.
+**Fixing what these two modes surface.** A finding that resolves into a safe mechanical patch
+is committed under the **chore** kind — no iteration, no lane to weigh: apply it and move on.
+Ceremony returns only when the fix carries a choice or a lesson, which escalates it to an
+iteration before the commit. The chore's own contract limits — what it may stage, and when it
+is refused — belong to `/saf`; read them there rather than from a copy that can drift.
 
 ## groom
 The only persistent-writing mode. Scope: backlog hygiene.

@@ -478,11 +478,15 @@ def cmd_verify(args, repo: Path, engine: list[str]) -> int:
                 and fp["language"]["verdict"] == "non-english"):
             emit(findings, WARN, now_rel, "still reads as non-English (triage signal)")
 
-        if now["title"] and now["id"]:
+        # Only warn where `rename` would actually act: on a held type it moves nothing unless
+        # the same `--allow-holds` is passed to it, and pointing at a command that then skips
+        # the file is worse than saying nothing.
+        if now["title"] and now["id"] and (fp["policy"] == "translate" or args.allow_holds):
             expected = f"{now['id']}_{slugify(now['title'])}.md"
             if Path(now_rel).name != expected:
+                hint = "rename --allow-holds" if fp["policy"] != "translate" else "rename"
                 emit(findings, WARN, now_rel,
-                     f"filename no longer matches its title (expected {expected}) — run `rename`")
+                     f"filename no longer matches its title (expected {expected}) — run `{hint}`")
 
     for rel in sorted(set(after) - set(before) - set(renames.values())):
         emit(findings, WARN, rel, "new file, absent from the snapshot — outside this migration?")
@@ -527,14 +531,34 @@ def cmd_rename(args, repo: Path, engine: list[str]) -> int:
     snap = _load_snapshot(args, repo)
     if snap is None:
         return 2
+    before = snap.get("files") or {}
     after = corpus(repo)
     moves: list[tuple[str, str]] = []
+    untouched = 0
     for rel, fp in sorted(after.items()):
-        if not fp["title"] or not fp["id"] or fp["policy"] != "translate":
+        if not fp["title"] or not fp["id"]:
             continue
+        # A held type is not re-slugged by default. When the senior deliberately edited one
+        # (`--allow-holds`, the same door `verify` opens), the address follows the title: an
+        # English title over a filename in the old language is the one state nobody disposed.
+        # The flag authorizes the records the pass TOUCHED, never the whole type — a held file
+        # the translation never opened keeps its name, however far that name is from the
+        # current slug convention. Re-addressing closed work nobody edited is the move the
+        # hold policy exists to refuse.
+        if fp["policy"] != "translate":
+            if not args.allow_holds:
+                continue
+            was = before.get(rel)
+            if was is not None and was["sha256"] == fp["sha256"]:
+                untouched += 1
+                continue
         expected = f"{fp['id']}_{slugify(fp['title'])}.md"
         if Path(rel).name != expected:
             moves.append((rel, (Path(rel).parent / expected).as_posix()))
+    if untouched:
+        # Said out loud: a narrowing the caller cannot see reads as a bug the next time the
+        # count does not match what `verify` reported.
+        print(f"{untouched} held file(s) left alone — unchanged since the snapshot.\n")
     if not moves:
         print("every filename already matches its title.")
         return 0
@@ -624,6 +648,9 @@ def main(argv=None) -> int:
 
     p = sub.add_parser("rename", help="re-slug filenames from the new titles via git mv")
     p.add_argument("--apply", action="store_true", help="perform the moves (default: dry run)")
+    p.add_argument("--allow-holds", action="store_true",
+                   help="also re-slug the held records this pass edited (unchanged ones keep "
+                        "their name) — the same door `verify --allow-holds` opens")
 
     args = ap.parse_args(argv)
     repo = Path(args.repo).resolve() if args.repo else find_repo(Path.cwd().resolve())
